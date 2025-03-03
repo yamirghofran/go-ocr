@@ -16,7 +16,7 @@ This application converts PDF documents to markdown text using Google's Gemini A
 
 ```bash
 # Clone the repository
-git clone https://github.com/yamirghofran0/go-ocr.git
+git clone https://github.com/yamirghofran/go-ocr.git
 cd go-ocr
 
 # Install dependencies

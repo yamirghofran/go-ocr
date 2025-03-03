@@ -1,4 +1,4 @@
-module github.com/yamirghofran0/go-ocr
+module github.com/yamirghofran/go-ocr
 
 go 1.23
 
