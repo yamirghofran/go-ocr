@@ -687,6 +687,36 @@ func DownloadPDF(pdfPath string) (string, error) {
 	return fileName, nil
 }
 
+// SafeConvertPDFToImages attempts to convert a PDF to images with error handling for problematic PDFs
+func SafeConvertPDFToImages(pdfPath string, outputDir string) (int, error) {
+	// Create a channel to receive the result
+	resultCh := make(chan struct {
+		count int
+		err   error
+	}, 1) // Buffer of 1 to prevent goroutine leak if we timeout
+
+	// Run the conversion in a separate goroutine
+	go func() {
+		count, err := ConvertPDFToImages(pdfPath, outputDir)
+		select {
+		case resultCh <- struct {
+			count int
+			err   error
+		}{count, err}:
+		default:
+			// Channel is full or closed, which means we've already timed out
+		}
+	}()
+
+	// Wait for the result with a timeout
+	select {
+	case result := <-resultCh:
+		return result.count, result.err
+	case <-time.After(60 * time.Second): // Adjust timeout as needed
+		return 0, fmt.Errorf("PDF conversion timed out, the file may be problematic")
+	}
+}
+
 // OcrPdfToMarkdown converts a PDF to markdown using Gemini API.
 // It takes the PDF path (local file path or URL) and API key as input
 // and returns the markdown content or an error.
@@ -697,15 +727,16 @@ func OcrPdfToMarkdown(pdfPath string, apiKey string) (string, error) {
 		return "", fmt.Errorf("error getting PDF: %w", err)
 	}
 
-	outputDir := "output_images" // You can make this configurable if needed
-	markdownPath := "output.md"  // You can make this configurable if needed
+	outputDir := "output_images"
+	markdownPath := "output.md"
 	ctx := context.Background()
 
-	// Convert PDF to images
-	numConverted, err := ConvertPDFToImages(localPdfPath, outputDir)
+	// Try to convert PDF to images with safer handling
+	numConverted, err := SafeConvertPDFToImages(localPdfPath, outputDir)
 	if err != nil {
 		return "", fmt.Errorf("error converting PDF to images: %w", err)
 	}
+
 	fmt.Printf("Successfully converted %d pages to images\n", numConverted)
 
 	// Process images in batches with concurrency limit and save markdown
